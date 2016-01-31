@@ -1,0 +1,79 @@
+---
+title: "Prediction Assignment Writeup"
+author: ""
+date: "Januar 2016"
+output: html_document
+---
+
+```{r}
+set.seed(323)
+library(caret)
+```
+
+The training and test data were downloaded and loaded in to R. 
+```{r}
+#download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",
+#                     destfile = "pml-training.csv")
+#download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",
+#                           destfile = "pml-testing.csv")
+pmlTrain <- read.csv(file="pml-training.csv")
+pmlTest <- read.csv(file="pml-testing.csv")
+```
+
+The data contains a number of values that appear to be Excel error strings. These values were replaced with an NA value.
+```{r}
+pmlTrain[pmlTrain=="#DIV/0!"] <- NA
+```
+
+Many variables in the data contain almost no actual values. These variables were removed.
+```{r}
+pmlTrain <- pmlTrain[,colSums(is.na(pmlTrain))==0]
+```
+
+Several other variables were removed that would not contribute to the analysis. 
+```{r}
+pmlTrain <- pmlTrain[,-c(1:7)]
+```
+
+The remaining variables are listed below.
+```{r}
+names(pmlTrain)
+```
+
+The data is partitioned into a training and validation set. 
+```{r}
+inTrain <- createDataPartition(y = pmlTrain$classe, p = 3/4)[[1]]
+training <- pmlTrain[inTrain,]
+validation <- pmlTrain[-inTrain,]
+```
+
+No remaining variabls appear to have near zero variance.
+```{r}
+nearZeroVar(training)
+```
+
+The first method implemented was a single tree, but the accuracy of the model is rather low.
+```{r}
+rpmodel <- train(classe~., data=training, method="rpart")
+rpmodel$results
+```
+
+The second method implemented was random forests, and the accuracy was much higher than the first model.
+```{r}
+rfmodel <- train(classe~., data = training, method = "rf", 
+                 trControl = trainControl( method="cv",number=4,allowParallel = TRUE))
+rfmodel$results
+```
+
+The random forests model prediction on the validation set was also rather accurate. The out-of-sample error from the cross validation set is 0.0071.
+```{r}
+rfpre <- predict(rfmodel, validation)
+confusionMatrix(rfpre,validation$classe)
+```
+
+The random forests model was applied to the test set and the predictions are provided below. 
+```{r}
+predict(rfmodel, pmlTest)
+```
+
+
